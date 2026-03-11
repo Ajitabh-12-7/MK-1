@@ -15,9 +15,7 @@
 
 **[🚀 Live Demo](https://ajitabh-12-7-mk-1-app.streamlit.app)** · **[📝 Blog Post](#)** · **[📊 Architecture](#architecture)**
 
----
 
-> 📸 **Demo GIF** — *Record a quick screen capture of the app running and drop it here as `docs/demo.gif`*
 
 </div>
 
@@ -207,11 +205,7 @@ MK-1/
 
 ## Author
 
-**Ajitabh Mishra** · B.Tech CSE, Sharda University (2026)
-
-*Built as a portfolio centrepiece for Generative AI, Agentic AI, and MLOps roles.*
-
----
+**Ajitabh Mishra** · 
 
 <div align="center">
 <sub>LangGraph · Groq · Tavily · Streamlit · LangSmith</sub>
