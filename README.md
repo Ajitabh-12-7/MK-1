@@ -2,7 +2,7 @@
 
 # 🔭 MARS — Multi-Agent Research System
 
-**Autonomous AI Team for Deep Research & Report Generation**
+**Autonomous AI team for deep research & publication-ready reports**
 
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
 [![LangGraph](https://img.shields.io/badge/LangGraph-0.2.x-7C3AED?style=for-the-badge)](https://langchain-ai.github.io/langgraph/)
@@ -11,9 +11,13 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.35+-EF4444?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
 [![LangSmith](https://img.shields.io/badge/LangSmith-Tracing-F59E0B?style=for-the-badge)](https://smith.langchain.com)
 
-*Enter a topic. Three AI agents search the web, extract facts, and write a publication-ready report — automatically.*
+*Enter a topic → three AI agents search the web, extract facts, and write a grounded report. Automatically.*
 
-**[🚀 Live Demo](https://your-app.streamlit.app)**  ·  **[📝 Blog Post](#)**  ·  **[📊 LangSmith Traces](#)**
+**[🚀 Live Demo](https://ajitabh-12-7-mk-1-app.streamlit.app)** · **[📝 Blog Post](#)** · **[📊 Architecture](#architecture)**
+
+---
+
+> 📸 **Demo GIF** — *Record a quick screen capture of the app running and drop it here as `docs/demo.gif`*
 
 </div>
 
@@ -21,51 +25,103 @@
 
 ## What is MARS?
 
-MARS orchestrates a team of three specialised AI agents in a sequential pipeline:
+MARS coordinates three specialised AI agents in a strict sequential pipeline. No hallucination — every sentence in the final report is sourced from a URL that was fetched and verified.
 
 ```
-User Topic → [Agent 1: Searcher] → [Agent 2: Extractor] → [Agent 3: Writer] → Report
+User Topic  →  [🔍 Searcher]  →  [📄 Extractor]  →  [✍️ Writer]  →  Report
 ```
 
-| Agent | Tool | Job |
+| Agent | Tools | Responsibility |
 |---|---|---|
-| 🔍 **Web Searcher** | Tavily API + Groq LLM | Searches the web, refines query, returns top 10 sources |
-| 📄 **Content Extractor** | httpx + BeautifulSoup4 + Groq LLM | Fetches pages, parses HTML, extracts key facts |
-| ✍️ **Report Writer** | Groq LLM (llama-3.3-70b) | Synthesises a grounded, citation-backed markdown report |
+| 🔍 **Web Searcher** | Tavily API + Groq LLM | Refines query, searches web, returns top 10 sources |
+| 📄 **Fact Extractor** | httpx + BeautifulSoup4 + Groq LLM | Fetches pages, strips boilerplate, extracts key facts |
+| ✍️ **Report Writer** | Groq LLM (llama-3.3-70b) | Synthesises a structured, citation-backed markdown report |
 
 ---
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    USER INTERFACE LAYER                         │
-│              Streamlit (app.py) — Dark Glassmorphic UI          │
-└───────────────────────────┬─────────────────────────────────────┘
-                            │
-┌───────────────────────────▼─────────────────────────────────────┐
-│                  ORCHESTRATION LAYER                            │
-│   LangGraph StateGraph  ──  search → extract → write → END     │
-│   LangSmith ── traces every node: tokens, latency, errors      │
-└──────────┬────────────────────┬────────────────────┬────────────┘
-           │                    │                    │
-┌──────────▼──────┐   ┌─────────▼──────┐   ┌────────▼───────────┐
-│  AGENT 1        │   │  AGENT 2        │   │  AGENT 3           │
-│  Web Searcher   │   │  Extractor      │   │  Report Writer     │
-│  Tavily + Groq  │   │  httpx + BS4    │   │  Groq llama-3.3    │
-└──────────┬──────┘   │  + Groq         │   └────────────────────┘
-           │          └────────────────┘
-┌──────────▼─────────────────────────────────────────────────────┐
-│                     DATA LAYER                                 │
-│      LangGraph AgentState TypedDict — passed between nodes     │
-│      ChromaDB (v2) — optional vector store for large corpora   │
-└─────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    U([👤 User]) -->|Topic| UI[Streamlit UI<br/>app.py]
+    UI -->|invoke| ORC[LangGraph Orchestrator<br/>StateGraph]
+
+    ORC -->|search_node| A1[🔍 Agent 1 — Web Searcher<br/>Tavily + ChatGroq]
+    A1 -->|search_results| ORC
+
+    ORC -->|extract_node| A2[📄 Agent 2 — Fact Extractor<br/>httpx + BS4 + ChatGroq]
+    A2 -->|extracted_facts| ORC
+
+    ORC -->|write_node| A3[✍️ Agent 3 — Report Writer<br/>ChatGroq llama-3.3-70b]
+    A3 -->|report| ORC
+
+    ORC -->|AgentState| UI
+    UI -->|Markdown Report| U
+
+    ORC -.->|traces| LS[🔭 LangSmith<br/>Observability]
+
+    style ORC fill:#7C3AED,color:#fff
+    style A1 fill:#1E293B,color:#fff
+    style A2 fill:#1E293B,color:#fff
+    style A3 fill:#1E293B,color:#fff
+    style UI fill:#0F172A,color:#fff
+    style LS fill:#F59E0B,color:#000
 ```
 
 **Key design decisions:**
-- **LangGraph over CrewAI/AutoGen**: Graph-based state model maps directly to this sequential pipeline. LangSmith tracing proves it's production-grade.
-- **Groq (free tier)** over OpenAI: `llama-3.3-70b-versatile` at 0 cost, ~300 tok/sec. One import swap from `ChatOpenAI`.
-- **Tavily** over SerpAPI/DuckDuckGo: Built natively for LLM agents — returns clean structured snippets, not raw HTML.
+
+- **LangGraph over CrewAI/AutoGen** — Graph-based state model with explicit transitions. Every `search_results → extracted_facts → report` handoff is typed and inspectable in LangSmith.
+- **Groq (free)** over OpenAI — `llama-3.3-70b-versatile` at 0 cost, ~300 tok/sec, one import swap from `ChatOpenAI`.
+- **Tavily** over SerpAPI — Built for LLM agents. Returns clean structured results, not raw HTML scraped pages.
+- **Streamlit** for UI — Fastest path to a public live URL for a portfolio project. React/Framer Motion planned for v2.
+
+---
+
+## Real Engineering Challenges I Solved
+
+> *The stuff that doesn't make it into tutorials — but is what employers actually want to see.*
+
+### 1. Groq Rate Limit Hell (30 RPM on free tier)
+The pipeline calls the LLM **three times** per run (query refinement, fact extraction, report writing). On Groq's free tier that's 30 requests/minute. Early runs crashed with `429 Too Many Requests` mid-pipeline after the first two agents.
+
+**Fix:** Explicit `time.sleep(2)` between agent transitions in `orchestrator.py` + exponential backoff starting at 4s on 429:
+```python
+for attempt in range(MAX_RETRIES):
+    try:
+        return llm.invoke(messages)
+    except Exception as e:
+        if "429" in str(e):
+            wait = BACKOFF_BASE ** attempt
+            time.sleep(wait)
+```
+
+### 2. Playwright vs httpx — When to Use Which
+Simple `httpx.get()` fails silently on JS-rendered pages (React SPAs, Next.js sites). The extractor returned empty strings for ~30% of URLs in early testing.
+
+**Fix:** Two-stage fetching — httpx first, Playwright as fallback only when the response body is too short (< 500 chars):
+```python
+text = await _fetch_httpx(url)
+if len(text) < 500:
+    text = await _fetch_playwright(url)
+```
+
+### 3. LLM Hallucination in Reports
+Early writer prompts produced confident-sounding reports with facts that weren't in the extracted data. Classic LLM behaviour.
+
+**Fix:** Grounding prompt with hard constraints — the writer is only allowed to use verbatim facts from the `_build_facts_block()` output:
+```
+STRICT RULE: Only use facts from the FACTS BLOCK below.
+Do NOT add anything from your training data.
+If a fact is not in the block, do not write it.
+```
+
+### 4. BeautifulSoup Parser Compatibility
+`lxml` (the fastest BS4 parser) requires Microsoft C++ Build Tools on Windows — a 4GB download that's unreasonable to require. Most tutorials assume Linux.
+
+**Fix:** Switched to Python's built-in `html.parser` — slower but zero dependencies, works on all platforms:
+```python
+soup = BeautifulSoup(html, "html.parser")  # No C++ Build Tools needed
+```
 
 ---
 
@@ -73,142 +129,90 @@ User Topic → [Agent 1: Searcher] → [Agent 2: Extractor] → [Agent 3: Writer
 
 ### 1. Clone
 ```bash
-git clone https://github.com/yourusername/MARS-MultiAgent-Research.git
-cd MARS-MultiAgent-Research
+git clone https://github.com/Ajitabh-12-7/MK-1.git
+cd MK-1
 ```
 
 ### 2. Virtual environment
-```bash
-python -m venv .venv
+```powershell
 # Windows
-.venv\Scripts\activate
-# Mac/Linux
-source .venv/bin/activate
+python -m venv .venv
+.venv\Scripts\Activate
 ```
 
-### 3. Install dependencies
+### 3. Install
 ```bash
 pip install -r requirements.txt
-playwright install chromium   # optional: for JS-heavy pages
+python -m playwright install chromium   # optional
 ```
 
 ### 4. Configure API keys
 ```bash
-cp .env.example .env
-# Edit .env and add your keys:
-# GROQ_API_KEY      — https://console.groq.com/  (free)
-# TAVILY_API_KEY    — https://app.tavily.com/     (free, 1K calls/mo)
-# LANGCHAIN_API_KEY — https://smith.langchain.com (free)
+copy .env.example .env
+# Edit .env — add GROQ_API_KEY, TAVILY_API_KEY, LANGCHAIN_API_KEY
 ```
 
 ### 5. Run
 ```bash
-streamlit run app.py
+python -m streamlit run app.py
 ```
-
-Open [http://localhost:8501](http://localhost:8501) in your browser.
+Open **http://localhost:8501**
 
 ---
 
-## CLI Mode
+## Free API Keys
 
-Each agent can be tested independently:
-```bash
-# Test Searcher
-python agents/searcher.py
-
-# Test Extractor
-python agents/extractor.py
-
-# Test Writer
-python agents/writer.py
-
-# Run full pipeline on a topic
-python orchestrator.py "LangGraph multi-agent systems 2025"
-```
-
----
-
-## Testing
-```bash
-# Full test suite
-python tests/test_pipeline.py
-
-# With pytest (if installed)
-python -m pytest tests/ -v
-```
-
----
-
-## Deployment (Streamlit Community Cloud)
-
-1. Push repo to GitHub (public)
-2. Go to [share.streamlit.io](https://share.streamlit.io)
-3. Connect your GitHub repo → select `app.py`
-4. Add secrets: `GROQ_API_KEY`, `TAVILY_API_KEY`, `LANGCHAIN_API_KEY`
-5. Deploy — your public URL is live in ~60 seconds
+| Key | Link | Free Tier |
+|---|---|---|
+| `GROQ_API_KEY` | [console.groq.com](https://console.groq.com) | 30 RPM, 14,400 req/day |
+| `TAVILY_API_KEY` | [app.tavily.com](https://app.tavily.com) | 1,000 searches/month |
+| `LANGCHAIN_API_KEY` | [smith.langchain.com](https://smith.langchain.com) | Free tracing tier |
 
 ---
 
 ## Tech Stack
 
-| Category | Tool | Why |
-|---|---|---|
-| Agent Framework | LangGraph 0.2.x | Best state management for 3-node pipeline |
-| LLM | Groq + llama-3.3-70b | Zero cost, ~300 tok/sec, OpenAI-compatible |
-| Web Search | Tavily | Built for LLM agents, clean structured results |
-| Web Scraping | httpx + BS4 + Playwright | Handles 90%+ of real-world URLs |
-| UI | Streamlit 1.35+ | Fastest path to public live URL |
-| Observability | LangSmith | Full trace: tokens, latency, agent steps |
-| Hosting | Streamlit Community Cloud | Free, 24/7 public URL |
-
----
-
-## Rate Limits
-
-Groq free tier: 30 RPM. A `time.sleep(2)` guard is placed between each agent transition. On 429 errors → exponential backoff starting at 4s.
-
-```python
-# orchestrator.py
-time.sleep(2)   # Between search → extract
-time.sleep(2)   # Between extract → write
-```
+| Layer | Technology |
+|---|---|
+| Agent Framework | LangGraph 0.2.x |
+| LLM | Groq + llama-3.3-70b-versatile |
+| Web Search | Tavily Python SDK |
+| Web Scraping | httpx + BeautifulSoup4 + Playwright |
+| UI | Streamlit 1.35+ |
+| Observability | LangSmith |
+| Hosting | Streamlit Community Cloud |
 
 ---
 
 ## Project Structure
 
 ```
-MARS/
-├── app.py                # Streamlit UI entry point
-├── orchestrator.py       # LangGraph StateGraph pipeline
-├── config.py             # Centralised env loading
+MK-1/
+├── app.py               # Streamlit UI (dark glassmorphic design)
+├── orchestrator.py      # LangGraph StateGraph pipeline
+├── config.py            # Centralised env/key loading
 ├── requirements.txt
 ├── .env.example
-├── .gitignore
 ├── .streamlit/
-│   └── config.toml       # Streamlit dark theme
+│   └── config.toml      # Dark theme config
 ├── agents/
-│   ├── searcher.py       # Agent 1 — Web Searcher
-│   ├── extractor.py      # Agent 2 — Content Extractor
-│   └── writer.py         # Agent 3 — Report Writer
-├── tests/
-│   └── test_pipeline.py  # Unit + integration tests
-└── docs/
-    └── architecture.png  # System diagram
+│   ├── searcher.py      # Agent 1 — Web Searcher
+│   ├── extractor.py     # Agent 2 — Fact Extractor
+│   └── writer.py        # Agent 3 — Report Writer
+└── tests/
+    └── test_pipeline.py # Unit + integration tests
 ```
 
 ---
 
 ## Author
 
-**Ajitabh Mishra (Dan)**
-B.Tech CSE · Sharda University · 3rd Year · 2026
+**Ajitabh Mishra** · B.Tech CSE, Sharda University (2026)
 
-*This project is designed as a portfolio centrepiece for Generative AI, Agentic AI, and MLOps roles.*
+*Built as a portfolio centrepiece for Generative AI, Agentic AI, and MLOps roles.*
 
 ---
 
 <div align="center">
-<sub>Built with LangGraph · Groq · Tavily · Streamlit · LangSmith</sub>
+<sub>LangGraph · Groq · Tavily · Streamlit · LangSmith</sub>
 </div>
