@@ -1,0 +1,17 @@
+# Streamlit Cloud configuration
+# Place in .streamlit/config.toml
+
+[theme]
+base = "dark"
+backgroundColor = "#0F172A"
+secondaryBackgroundColor = "#1E293B"
+textColor = "#F8FAFC"
+primaryColor = "#7C3AED"
+font = "sans serif"
+
+[server]
+headless = true
+port = 8501
+
+[browser]
+gatherUsageStats = false
